@@ -1,0 +1,26 @@
+name: Unit Tests CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Build Environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential gcc make
+
+    - name: Run Unit Tests
+      run: |
+        cd tests
+        make clean
+        make test

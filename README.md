@@ -79,22 +79,52 @@ graph TD
 
 実機運用においてシステム停止やセキュリティ障害を招く以下の重要課題について、修正パッチを適用済みです。
 
-1. **TLS ルート CA 証明書の更新（Baltimore 満了対応）** ([`src/nx_azure_iot_cert.c`](src/nx_azure_iot_cert.c))
+1. **TLS ルート CA 証明書の更新（Baltimore 満了対応）** ([`src/app/nx_azure_iot_cert.c`](src/app/nx_azure_iot_cert.c))
    - 2025年5月12日に失効した DigiCert Baltimore Root を完全無効化し、2038年まで有効な **DigiCert Global Root G2** をプライマリ CA として適用。
-2. **EDMAC 送信ヘッダの非アライメント境界違反解消** ([`src/nx_driver_rx_fit.c`](src/nx_driver_rx_fit.c))
+2. **EDMAC 送信ヘッダの非アライメント境界違反解消** ([`src/driver/nx_driver_rx_fit.c`](src/driver/nx_driver_rx_fit.c))
    - `(ULONG *)(packet_ptr->nx_packet_prepend_ptr - 2)` による 2バイト整列不正キャストおよび構造体アンダーランを廃止し、バイト単位コピー（`memcpy`）による安全な 14バイト Ethernet ヘッダ構築へ変更。
    - ISR/タスク間共有フラグに `volatile ULONG deferred_events_flags;` を適用。
-3. **シリアル出力のバッファオーバーランおよびデッドロック防止** ([`src/demo_printf.c`](src/demo_printf.c))
+3. **シリアル出力のバッファオーバーランおよびデッドロック防止** ([`src/driver/demo_printf.c`](src/driver/demo_printf.c))
    - `vsnprintf` 出力の上限クリップ（255バイト制限＋終端 `\0` 保証）。
    - SCI 送信エラー時のセマフォ待機スキップおよびセマフォ待機タイムアウト（1秒）を設定し、永久デッドロックを防止。
-4. **指数バックオフの 32bit 符号付き整数オーバーフロー防止** ([`src/sample_azure_iot_embedded_sdk_connect.c`](src/sample_azure_iot_embedded_sdk_connect.c))
+4. **指数バックオフの 32bit 符号付き整数オーバーフロー防止** ([`src/app/sample_azure_iot_embedded_sdk_connect.c`](src/app/sample_azure_iot_embedded_sdk_connect.c))
    - `(1 << retry_count)` で `retry_count >= 31` 時に発生する未定義動作（負数化）を、リトライ回数上限（8回）クリップおよび `1ULL` 64bit シフトで防止。
-5. **ネットワーク再接続ステータスの同期伝播** ([`src/sample_azure_iot_embedded_sdk.c`](src/sample_azure_iot_embedded_sdk.c))
+5. **ネットワーク再接続ステータスの同期伝播** ([`src/app/sample_azure_iot_embedded_sdk.c`](src/app/sample_azure_iot_embedded_sdk.c))
    - `sample_connection_monitor` の引数をポインタ渡しに変更し、再接続成功時に `sample_connection_status = NX_SUCCESS` を確実に更新。各ワーカタスクの永久スリープを解消。
 
 ---
 
-## 4. 開発環境要件
+## 4. リポジトリ構成
+
+```text
+src/
+├── main.c                          # システムエントリ
+├── linker_script.ld                # GCC リンカスクリプト
+├── app/                            # Azure IoT Hub アプリケーション層
+│   ├── sample_azure_iot_embedded_sdk.c
+│   ├── sample_azure_iot_embedded_sdk_connect.c
+│   ├── sample_config.h
+│   ├── sample_device_identity.c
+│   ├── nx_azure_iot_cert.c
+│   ├── nx_azure_iot_cert.h
+│   ├── nx_azure_iot_ciphersuites.c
+│   └── nx_azure_iot_ciphersuites.h
+├── driver/                         # ハードウェア結合・カスタムドライバ層
+│   ├── hardware_setup.c
+│   ├── hardware_setup.h
+│   ├── demo_printf.c
+│   ├── demo_printf.h
+│   ├── nx_driver_rx_fit.c
+│   ├── nx_driver_rx_fit.h
+│   ├── nx_driver_rx_fit_callback.c
+│   └── nx_driver_rx_fit_callback.h
+├── rtos_config/                    # Smart Configurator RTOS設定
+└── smc_gen/                        # FITドライバ・BSPコード群
+```
+
+---
+
+## 5. 開発環境要件
 
 - **ターゲットハードウェア**:
   - Renesas RX65N Cloud Kit (Y-RX65N-CLOUD-KIT) または Envision Kit
@@ -109,16 +139,16 @@ graph TD
 
 ---
 
-## 5. ビルドおよび実行手順
+## 6. ビルドおよび実行手順
 
-### 5.1 リポジトリのクローン
+### 6.1 リポジトリのクローン
 ```bash
 git clone https://github.com/kumata93/RenesasRXAzureIoT.git
 cd RenesasRXAzureIoT
 ```
 
-### 5.2 接続情報の設定 (`sample_config.h`)
-[`src/sample_config.h`](src/sample_config.h) を開き、ご使用の Azure IoT Hub 接続パラメータを設定します。
+### 6.2 接続情報の設定 (`sample_config.h`)
+[`src/app/sample_config.h`](src/app/sample_config.h) を開き、ご使用の Azure IoT Hub 接続パラメータを設定します。
 
 ```c
 /* Direct Connection (IoT Hub Host Name & Device ID) */
@@ -129,13 +159,13 @@ cd RenesasRXAzureIoT
 #define DEVICE_SYMMETRIC_KEY    "your-device-primary-symmetric-key"
 ```
 
-### 5.3 ビルド手順 (e2 studio)
+### 6.3 ビルド手順 (e2 studio)
 1. e2 studio を起動し、ワークスペースを開きます。
 2. `File` $\to$ `Import...` $\to$ `General` $\to$ `Existing Projects into Workspace` を選択し、本リポジトリのルートディレクトリを指定してインポートします。
 3. プロジェクトツリーでプロジェクトを右クリック $\to$ `Build Project` を実行します。
 4. `HardwareDebug/azure_sdk.elf` が正常に生成されたことを確認します。
 
-### 5.4 フラッシュ書き込みとデバッグ実行
+### 6.4 フラッシュ書き込みとデバッグ実行
 1. ターゲットボードの Ethernet ポートに LAN ケーブルを接続し、USB デバッグポートを PC に接続します。
 2. PC 側でシリアルターミナル（Tera Term 等）を起動します（`115,200 bps`, `8bit`, `Parity None`, `Stop 1bit`）。
 3. e2 studio にて `azure_sdk HardwareDebug.launch` を選択し、デバッグを開始します（`F8` で実行）。
@@ -156,7 +186,7 @@ Telemetry message sent: {"Message ID":1}
 
 ---
 
-## 6. ビルド・環境に関する注意事項
+## 7. ビルド・環境に関する注意事項
 
 1. **`double` 型のサイズ設定**:
    - Azure SDK および JSON パーサーで 64bit 浮動小数点数を正しく扱うため、GCC プロジェクトのビルドオプションには `-m64bit-doubles` が設定されています（CC-RX の場合は `-dbl_size=8`）。
@@ -169,5 +199,5 @@ Telemetry message sent: {"Message ID":1}
 
 ---
 
-## 7. ライセンス
+## 8. ライセンス
 本ソフトウェアは、Microsoft Azure RTOS ソフトウェアライセンス条項（EULA）に基づいて提供されています。詳細については [LICENSE](LICENSE) ファイルをご参照ください。

@@ -221,10 +221,10 @@ typedef union SAMPLE_CLIENT_UNION
 
 | 変数名 | 型 | スコープ | 排他制御メカニズム | 備考 |
 |:---|:---|:---|:---|:---|
-| `sample_connection_status` | `volatile UINT` | `sample_azure_iot_embedded_sdk.c` | 単一ライター（監視タスク/コールバック）+ `volatile` | 接続状態フラグ（0: 正常, 以外: 異常） |
-| `demo_printf_mutex` | `TX_MUTEX` | `demo_printf.c` | ThreadX Mutex (`TX_WAIT_FOREVER`) | UART 出力バッファおよびハードウェア排他 |
-| `demo_printf_semaphore` | `TX_SEMAPHORE` | `demo_printf.c` | ThreadX Binary Semaphore (1秒タイムアウト) | 送信完了 ISR $\to$ タスク同期 |
-| `deferred_events_flags` | `volatile ULONG` | `nx_driver_rx_fit.c` | アトミックビット操作 + `volatile` | EDMAC 割込み $\to$ ドライバタスク通知 |
+| `sample_connection_status` | `volatile UINT` | `src/app/sample_azure_iot_embedded_sdk.c` | 単一ライター（監視タスク/コールバック）+ `volatile` | 接続状態フラグ（0: 正常, 以外: 異常） |
+| `demo_printf_mutex` | `TX_MUTEX` | `src/driver/demo_printf.c` | ThreadX Mutex (`TX_WAIT_FOREVER`) | UART 出力バッファおよびハードウェア排他 |
+| `demo_printf_semaphore` | `TX_SEMAPHORE` | `src/driver/demo_printf.c` | ThreadX Binary Semaphore (1秒タイムアウト) | 送信完了 ISR $\to$ タスク同期 |
+| `deferred_events_flags` | `volatile ULONG` | `src/driver/nx_driver_rx_fit.c` | アトミックビット操作 + `volatile` | EDMAC 割込み $\to$ ドライバタスク通知 |
 
 ---
 

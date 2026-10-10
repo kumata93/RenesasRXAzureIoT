@@ -1,0 +1,17 @@
+# Build artifacts
+HardwareDebug/
+*.tmp
+*.o
+*.d
+*.elf
+*.mot
+*.map
+*.siz
+*.lst
+
+# Backups
+trash/
+
+# IDE / OS generated
+.settings/
+.clangd

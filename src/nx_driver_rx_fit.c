@@ -60,7 +60,7 @@ typedef struct netx_driver_rx_fit_data {
     NX_IP *netx_ip_ptr;
     NX_PACKET_POOL *netx_packet_pool_ptr;
     ULONG driver_state;
-    ULONG deferred_events_flags;
+    volatile ULONG deferred_events_flags;
     UINT rx_ether_chan;
 #if ETHER_CFG_USE_LINKSTA == 0
     TX_TIMER link_preodic_timer;
@@ -520,42 +520,53 @@ static VOID _netx_driver_packet_send(NX_IP_DRIVER *driver_req_ptr)
 
     packet_ptr->nx_packet_length = packet_ptr->nx_packet_length + NX_DRIVER_ETHERNET_FRAME_SIZE;
 
-    /* Setup the Ethernet frame pointer to build the Ethernet frame. */
-    frame_ptr = (ULONG *) (packet_ptr->nx_packet_prepend_ptr - 2);
-
-    /* Write the hardware addresses in the Ethernet header. */
-    *frame_ptr = driver_req_ptr->nx_ip_driver_physical_address_msw;
-    *(frame_ptr + 1) = driver_req_ptr->nx_ip_driver_physical_address_lsw;
-
-    *(frame_ptr + 2) = (driver_req_ptr->nx_ip_driver_interface->nx_interface_physical_address_msw << 16) |
-        (driver_req_ptr->nx_ip_driver_interface->nx_interface_physical_address_lsw >> 16);
-    *(frame_ptr + 3) = (driver_req_ptr->nx_ip_driver_interface->nx_interface_physical_address_lsw << 16);
-
-    /* Write the frame type field in the Ethernet harder. */
-    if((driver_req_ptr->nx_ip_driver_command == NX_LINK_ARP_SEND) || (driver_req_ptr->nx_ip_driver_command == NX_LINK_ARP_RESPONSE_SEND))
+    /* Build the Ethernet frame header safely without unaligned access or underflow. */
     {
-        *(frame_ptr + 3) |= NX_DRIVER_ETHERNET_ARP;
-    }
-    else if(driver_req_ptr->nx_ip_driver_command == NX_LINK_RARP_SEND)
-    {
-        *(frame_ptr + 3) |= NX_DRIVER_ETHERNET_RARP;
-    }
+        UCHAR eth_header[NX_DRIVER_ETHERNET_FRAME_SIZE];
+        USHORT eth_type;
+
+        /* Write Destination MAC address (6 bytes). */
+        eth_header[0] = (UCHAR)(driver_req_ptr->nx_ip_driver_physical_address_msw >> 8);
+        eth_header[1] = (UCHAR)(driver_req_ptr->nx_ip_driver_physical_address_msw);
+        eth_header[2] = (UCHAR)(driver_req_ptr->nx_ip_driver_physical_address_lsw >> 24);
+        eth_header[3] = (UCHAR)(driver_req_ptr->nx_ip_driver_physical_address_lsw >> 16);
+        eth_header[4] = (UCHAR)(driver_req_ptr->nx_ip_driver_physical_address_lsw >> 8);
+        eth_header[5] = (UCHAR)(driver_req_ptr->nx_ip_driver_physical_address_lsw);
+
+        /* Write Source MAC address (6 bytes). */
+        eth_header[6] = (UCHAR)(driver_req_ptr->nx_ip_driver_interface->nx_interface_physical_address_msw >> 8);
+        eth_header[7] = (UCHAR)(driver_req_ptr->nx_ip_driver_interface->nx_interface_physical_address_msw);
+        eth_header[8] = (UCHAR)(driver_req_ptr->nx_ip_driver_interface->nx_interface_physical_address_lsw >> 24);
+        eth_header[9] = (UCHAR)(driver_req_ptr->nx_ip_driver_interface->nx_interface_physical_address_lsw >> 16);
+        eth_header[10] = (UCHAR)(driver_req_ptr->nx_ip_driver_interface->nx_interface_physical_address_lsw >> 8);
+        eth_header[11] = (UCHAR)(driver_req_ptr->nx_ip_driver_interface->nx_interface_physical_address_lsw);
+
+        /* Determine frame type field (2 bytes, big-endian). */
+        if((driver_req_ptr->nx_ip_driver_command == NX_LINK_ARP_SEND) || (driver_req_ptr->nx_ip_driver_command == NX_LINK_ARP_RESPONSE_SEND))
+        {
+            eth_type = NX_DRIVER_ETHERNET_ARP;
+        }
+        else if(driver_req_ptr->nx_ip_driver_command == NX_LINK_RARP_SEND)
+        {
+            eth_type = NX_DRIVER_ETHERNET_RARP;
+        }
 #ifdef FEATURE_NX_IPV6
-    else if(packet_ptr->nx_packet_ip_version == NX_IP_VERSION_V6)
-    {
-        *(frame_ptr + 3) |= NX_DRIVER_ETHERNET_IPV6;
-    }
+        else if(packet_ptr->nx_packet_ip_version == NX_IP_VERSION_V6)
+        {
+            eth_type = NX_DRIVER_ETHERNET_IPV6;
+        }
 #endif
-    else
-    {
-        *(frame_ptr + 3) |= NX_DRIVER_ETHERNET_IP;
-    }
+        else
+        {
+            eth_type = NX_DRIVER_ETHERNET_IP;
+        }
 
-    /* Endian swapping if NX_LITTLE_ENDIAN is defined. */
-    NX_CHANGE_ULONG_ENDIAN(*(frame_ptr));
-    NX_CHANGE_ULONG_ENDIAN(*(frame_ptr + 1));
-    NX_CHANGE_ULONG_ENDIAN(*(frame_ptr + 2));
-    NX_CHANGE_ULONG_ENDIAN(*(frame_ptr + 3));
+        eth_header[12] = (UCHAR)(eth_type >> 8);
+        eth_header[13] = (UCHAR)(eth_type);
+
+        /* Copy Ethernet header directly to packet prepend buffer safely. */
+        memcpy(packet_ptr->nx_packet_prepend_ptr, eth_header, NX_DRIVER_ETHERNET_FRAME_SIZE);
+    }
 
     /* Determine if the packet exceeds the driver's MTU. */
     if(packet_ptr->nx_packet_length > NX_DRIVER_ETHERNET_MAX_FLAME_SIZE_EXCEPT_FCS)

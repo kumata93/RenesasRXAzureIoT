@@ -121,7 +121,7 @@ static void sample_device_twin_thread_entry(ULONG parameter);
 #endif /* DISABLE_DEVICE_TWIN_SAMPLE */
 
 /* Include the connection monitor function from sample_azure_iot_embedded_sdk_connect.c.  */
-extern VOID sample_connection_monitor(NX_IP *ip_ptr, NX_AZURE_IOT_HUB_CLIENT *iothub_client_ptr, UINT connection_status,
+extern VOID sample_connection_monitor(NX_IP *ip_ptr, NX_AZURE_IOT_HUB_CLIENT *iothub_client_ptr, UINT *connection_status_ptr,
                                       UINT (*iothub_init)(NX_AZURE_IOT_HUB_CLIENT *hub_client_ptr));
 
 static VOID printf_packet(NX_PACKET *packet_ptr)
@@ -196,11 +196,7 @@ UINT iothub_device_id_length = sizeof(DEVICE_ID) - 1;
     }
 
     /* Add more CA certificates.  */
-    if ((status = nx_azure_iot_hub_client_trusted_cert_add(iothub_client_ptr, &root_ca_cert_2)))
-    {
-        printf("Failed on nx_azure_iot_hub_client_trusted_cert_add!: error code = 0x%08x\r\n", status);
-    }
-    else if ((status = nx_azure_iot_hub_client_trusted_cert_add(iothub_client_ptr, &root_ca_cert_3)))
+    if ((status = nx_azure_iot_hub_client_trusted_cert_add(iothub_client_ptr, &root_ca_cert_3)))
     {
         printf("Failed on nx_azure_iot_hub_client_trusted_cert_add!: error code = 0x%08x\r\n", status);
     }
@@ -299,17 +295,10 @@ UINT loop = NX_TRUE;
         return;
     }
 
-    /* Initialize CA certificates.  */
-    if ((status = nx_secure_x509_certificate_initialize(&root_ca_cert, (UCHAR *)_nx_azure_iot_root_cert,
-                                                        (USHORT)_nx_azure_iot_root_cert_size,
-                                                        NX_NULL, 0, NULL, 0, NX_SECURE_X509_KEY_TYPE_NONE)))
-    {
-        printf("Failed to initialize ROOT CA certificate!: error code = 0x%08x\r\n", status);
-        nx_azure_iot_delete(&nx_azure_iot);
-        return;
-    }
-
-    if ((status = nx_secure_x509_certificate_initialize(&root_ca_cert_2, (UCHAR *)_nx_azure_iot_root_cert_2,
+    /* Initialize CA certificates.
+       DigiCert Global Root G2 (_nx_azure_iot_root_cert_2) is configured as the primary root certificate.
+       DigiCert Baltimore Root (_nx_azure_iot_root_cert) expired in May 2025 and is decommissioned.  */
+    if ((status = nx_secure_x509_certificate_initialize(&root_ca_cert, (UCHAR *)_nx_azure_iot_root_cert_2,
                                                         (USHORT)_nx_azure_iot_root_cert_size_2,
                                                         NX_NULL, 0, NULL, 0, NX_SECURE_X509_KEY_TYPE_NONE)))
     {
@@ -393,7 +382,7 @@ UINT loop = NX_TRUE;
     {
 
         /* Connection monitor.  */
-        sample_connection_monitor(ip_ptr, &iothub_client, sample_connection_status, sample_initialize_iothub);
+        sample_connection_monitor(ip_ptr, &iothub_client, (UINT *)&sample_connection_status, sample_initialize_iothub);
 
         tx_thread_sleep(NX_IP_PERIODIC_RATE);
     }
@@ -433,11 +422,7 @@ UINT status;
     *iothub_device_id_length = sizeof(sample_iothub_device_id);
 
     /* Add more CA certificates.  */
-    if ((status = nx_azure_iot_provisioning_client_trusted_cert_add(&prov_client, &root_ca_cert_2)))
-    {
-        printf("Failed on nx_azure_iot_provisioning_client_trusted_cert_add!: error code = 0x%08x\r\n", status);
-    }
-    else if ((status = nx_azure_iot_provisioning_client_trusted_cert_add(&prov_client, &root_ca_cert_3)))
+    if ((status = nx_azure_iot_provisioning_client_trusted_cert_add(&prov_client, &root_ca_cert_3)))
     {
         printf("Failed on nx_azure_iot_provisioning_client_trusted_cert_add!: error code = 0x%08x\r\n", status);
     }

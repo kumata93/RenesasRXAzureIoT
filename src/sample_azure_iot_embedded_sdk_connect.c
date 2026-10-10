@@ -25,7 +25,7 @@
 #define SAMPLE_MAX_EXPONENTIAL_BACKOFF_JITTER_PERCENT                   (60)
 #endif /* SAMPLE_MAX_EXPONENTIAL_BACKOFF_JITTER_PERCENT */
 
-VOID sample_connection_monitor(NX_IP *ip_ptr, NX_AZURE_IOT_HUB_CLIENT *iothub_client_ptr, UINT sample_status,
+VOID sample_connection_monitor(NX_IP *ip_ptr, NX_AZURE_IOT_HUB_CLIENT *iothub_client_ptr, UINT *connection_status_ptr,
                                UINT (*iothub_init)(NX_AZURE_IOT_HUB_CLIENT *hub_client_ptr));
 
 static UINT exponential_retry_count;
@@ -38,13 +38,16 @@ double jitter_percent = (SAMPLE_MAX_EXPONENTIAL_BACKOFF_JITTER_PERCENT / 100.0) 
 UINT base_delay = SAMPLE_MAX_EXPONENTIAL_BACKOFF_IN_SEC;
 uint64_t delay;
 
-    if (exponential_retry_count < (sizeof(UINT) * 8))
+    /* Cap exponential_retry_count to prevent signed 32-bit integer shift overflow (UB) */
+    if (exponential_retry_count > 8)
     {
-        delay = (uint64_t)((1 << exponential_retry_count) * SAMPLE_INITIAL_EXPONENTIAL_BACKOFF_IN_SEC);
-        if (delay <= (UINT)(-1))
-        {
-            base_delay = (UINT)delay;
-        }
+        exponential_retry_count = 8;
+    }
+
+    delay = (uint64_t)((1ULL << exponential_retry_count) * SAMPLE_INITIAL_EXPONENTIAL_BACKOFF_IN_SEC);
+    if (delay <= (UINT)(-1))
+    {
+        base_delay = (UINT)delay;
     }
 
     if (base_delay > SAMPLE_MAX_EXPONENTIAL_BACKOFF_IN_SEC)
@@ -99,17 +102,20 @@ static VOID exponential_backoff_reset()
  *
  *
  */
-VOID sample_connection_monitor(NX_IP *ip_ptr, NX_AZURE_IOT_HUB_CLIENT *hub_client_ptr, UINT connection_status,
+VOID sample_connection_monitor(NX_IP *ip_ptr, NX_AZURE_IOT_HUB_CLIENT *hub_client_ptr, UINT *connection_status_ptr,
                                UINT (*iothub_init)(NX_AZURE_IOT_HUB_CLIENT *hub_client_ptr))
 {
 UINT loop = NX_TRUE;
 ULONG gateway_address;
+UINT connection_status;
 
     /* Check parameters.  */
-    if ((ip_ptr == NX_NULL) || (hub_client_ptr == NX_NULL) || (iothub_init == NX_NULL))
+    if ((ip_ptr == NX_NULL) || (hub_client_ptr == NX_NULL) || (connection_status_ptr == NX_NULL) || (iothub_init == NX_NULL))
     {
         return;
     }
+
+    connection_status = *connection_status_ptr;
 
     /* Check if connected.  */
     if (connection_status == NX_SUCCESS)
@@ -198,6 +204,7 @@ ULONG gateway_address;
             /* Check status.  */
             if (connection_status == NX_SUCCESS)
             {
+                *connection_status_ptr = NX_SUCCESS;
                 return;
             }
         }

@@ -3,7 +3,8 @@
 [![Platform](https://img.shields.io/badge/Platform-Renesas%20RX65N-blue.svg)](https://www.renesas.com/products/microcontrollers-microprocessors/rx-32-bit-performance-efficiency-mcus/rx65n-651-32-bit-microcontrollers)
 [![RTOS](https://img.shields.io/badge/RTOS-Azure%20RTOS%20(ThreadX%20%2F%20NetX%20Duo)-0078D4.svg)](https://github.com/azure-rtos)
 [![Cloud](https://img.shields.io/badge/Cloud-Azure%20IoT%20Hub-0089D6.svg)](https://azure.microsoft.com/services/iot-hub/)
-[![License](https://img.shields.io/badge/License-Microsoft%20Azure%20RTOS%20EULA-green.svg)](LICENSE)
+[![Unit Tests CI](https://github.com/kumata93/RenesasRXAzureIoT/actions/workflows/ci.yml/badge.svg)](https://github.com/kumata93/RenesasRXAzureIoT/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Microsoft%20Azure%20RTOS%20EULA-green.svg)](LICENSE.txt)
 
 本リポジトリは、ルネサス エレクトロニクス製 32bit マイコン **RX65N (R5F565NEDDFB)** を対象とし、Microsoft **Azure RTOS (ThreadX / NetX Duo / FileX)** および **Azure IoT Embedded C SDK** を統合した産業用 IoT エッジデバイス向けファームウェアの完全な実装および設計書一式を提供します。
 
@@ -200,4 +201,4 @@ Telemetry message sent: {"Message ID":1}
 ---
 
 ## 8. ライセンス
-本ソフトウェアは、Microsoft Azure RTOS ソフトウェアライセンス条項（EULA）に基づいて提供されています。詳細については [LICENSE](LICENSE) ファイルをご参照ください。
+本ソフトウェアは、Microsoft Azure RTOS ソフトウェアライセンス条項（EULA）に基づいて提供されています。詳細については [LICENSE.txt](LICENSE.txt) ファイルをご参照ください。
